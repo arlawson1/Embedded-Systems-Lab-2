@@ -1,0 +1,224 @@
+// ECE486 LAB 2
+// This code was written by
+//        Andrew Lawson
+//  CWID: 1187 8092
+//        2-12-2019
+
+
+
+#include <Arduino.h>
+// Library containing 7-segment display functions
+#include <TM1637Display.h>
+
+// Module connection pins (Digital Pins)
+#define CLK 2
+#define DIO 3
+#define SWPIN 30
+// Defines for numbers 0-16 in hexadecimal
+#define ZERO 0x3f
+#define ONE 0x06
+#define TWO 0x5b
+#define THREE 0x4f
+#define FOUR 0x66
+#define FIVE 0x6d
+#define SIX 0x7d
+#define SEVEN 0x27
+#define EIGHT 0x7f
+#define NINE 0x67
+#define LETTER_a 0x5f
+#define LETTER_b 0x7c
+#define LETTER_c 0x58
+#define LETTER_d 0x5e
+#define LETTER_e 0x7b
+#define LETTER_f 0x71
+// Defines for blank & full section
+#define BLANK 0x00
+#define FULL 0xff
+
+void setup() {
+  // On-board LED pin
+  pinMode(13, OUTPUT);
+  digitalWrite(13, LOW);
+  // External LED pin
+  pinMode(22, OUTPUT);
+  digitalWrite(22, LOW);
+  // SPST maintained-switch pin
+  pinMode(SWPIN, INPUT);
+  Serial.begin(9600);
+}
+
+// print function for seven segment display
+  void sevenSegmentDisplay(int sevenSegNum, uint8_t data[],TM1637Display display){
+      if(sevenSegNum == 0){
+         data[3] = ZERO;
+      }
+      else if(sevenSegNum == 1){
+         data[3] = ONE;
+      }
+      else if(sevenSegNum == 2){
+         data[3] = TWO;
+      }
+      else if(sevenSegNum == 3){
+         data[3] = THREE;
+      }
+      else if(sevenSegNum == 4){
+         data[3] = FOUR;
+      }
+      else if(sevenSegNum == 5){
+         data[3] = FIVE;
+      }
+      else if(sevenSegNum == 6){
+         data[3] = SIX;
+      }
+      else if(sevenSegNum == 7){
+         data[3] = SEVEN;
+      }
+      else if(sevenSegNum == 8){
+         data[3] = EIGHT;
+      }
+      else if(sevenSegNum == 9){
+         data[3] = NINE;
+      }
+      else if(sevenSegNum == 10){
+         data[3] = LETTER_a;
+      }
+      else if(sevenSegNum == 11){
+         data[3] = LETTER_b;
+      }
+      else if(sevenSegNum == 12){
+         data[3] = LETTER_c;
+      }
+      else if(sevenSegNum == 13){
+         data[3] = LETTER_d;
+      }
+      else if(sevenSegNum == 14){
+         data[3] = LETTER_e;
+      }
+      else if(sevenSegNum == 15){
+         data[3] = LETTER_f;
+      }
+      display.setSegments(data);
+  }
+
+void loop() {
+  // Initialize 7-segment display class
+  TM1637Display display(CLK, DIO);
+  
+  // Initialize display to zero
+  uint8_t data[] = { BLANK, BLANK, BLANK, ZERO };
+  
+  // Set the brightness to a medium level
+  display.setBrightness(0x08);
+  
+  // Function to write initial contents of data to display
+  display.setSegments(data);
+
+  // Integer to count # state changes
+  int serialNum = 0;
+  int sevenSegNum = 0;
+  // State of switch (0 = OFF, 1 = ON)
+  boolean SW = 0;
+
+  // Enumeration for state of LEDs
+  // ON1 is the on-board LED on state
+  // ON2 is the external LED on state
+  enum switchState{ OFF, ON1, ON2 };
+  switchState state = OFF;
+  Serial.print("Turn the switch ON to start blinking LEDs\n");
+  Serial.print("Turn the switch OFF to stop blinking LEDs\n");
+
+  // Loop to run the code
+  while(1){
+      switch(state){
+          case OFF : 
+              Serial.print("Switch is now OFF. LEDs not blinking.\n");
+              // Turn both LEDs off
+              digitalWrite(13, LOW);
+              digitalWrite(22, LOW);
+              // Take a reading from the switch
+              SW = digitalRead(SWPIN);
+              // Slight delay to prevent bouncing
+              delay(10);
+              while(SW == 0){
+                  SW = digitalRead(SWPIN);
+                  delay(10);
+                  // If the switch is turned on
+                  if(SW == 1){
+                      // number of state changes increases by 1
+                      serialNum++;
+                      // display only the last hex digit of serialNum
+                      sevenSegNum = serialNum % 16;
+
+                      Serial.print("count = (decimal)");
+                      Serial.print(serialNum);
+                      Serial.print(" (hex)");
+                      Serial.print(sevenSegNum, HEX);
+                      Serial.print("\n");
+                      sevenSegmentDisplay(sevenSegNum, data, display);
+                      // Move to next state - blinking LEDS
+                      state = ON1;
+                      Serial.print("Switch is now ON. LEDs blinking.\n");
+                  }
+              }
+              // Resets state back to OFF so the FSM can wait for
+              // the switch to toggle from 0 to 1.
+              if(SW == 0){
+                  delay(10);
+                  state = OFF;
+              }
+              
+              break;
+
+          // Case to turn onboard LED on for 1 second
+          case ON1 : 
+              digitalWrite(13, HIGH);
+              digitalWrite(22, LOW);
+              // 100 loops of 10ms = 1s
+              for(int i = 0; i < 100; i++){
+                  SW = digitalRead(SWPIN);
+                  delay(10);
+                  if(SW == 0){
+                      serialNum++;
+                      sevenSegNum = serialNum % 16;
+                      Serial.print("count = (decimal)");
+                      Serial.print(serialNum);
+                      Serial.print(" (hex)");
+                      Serial.print(sevenSegNum, HEX);
+                      Serial.print("\n");
+                      sevenSegmentDisplay(sevenSegNum, data, display);
+                      state = OFF;
+                      break;
+                  }
+                  else{
+                      state = ON2;
+                  }
+              }
+              break;
+
+          // Case to turn external LED on for 1 second
+          case ON2 : 
+              digitalWrite(13, LOW);
+              digitalWrite(22, HIGH);
+              for(int i = 0; i < 100; i++){
+                  SW = digitalRead(SWPIN);
+                  delay(10);
+                  if(SW == 0){
+                      serialNum++;
+                      sevenSegNum = serialNum % 16;
+                      Serial.print("count = (decimal)");
+                      Serial.print(serialNum);
+                      Serial.print(" (hex)");
+                      Serial.print(sevenSegNum, HEX);
+                      Serial.print("\n");
+                      sevenSegmentDisplay(sevenSegNum, data, display);
+                      state = OFF;
+                      break;
+                  }
+                  else{
+                      state = ON1;
+                  }
+              }
+              break;
+      }
+  }
+}
